@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Distress Detection System</title>
+  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.6.10/firebase-database-compat.js"></script>
+  <style>
+    body {
+      font-family: Arial, sans-serif;
+      text-align: center;
+      padding: 40px;
+      transition: background 1s ease;
+    }
+
+    h1 {
+      color: #00796B;
+    }
+
+    .card {
+      background-color: white;
+      display: inline-block;
+      width: 220px;
+      margin: 20px;
+      padding: 20px;
+      border-radius: 10px;
+      box-shadow: 0px 0px 10px #ccc;
+      font-size: 18px;
+      transition: transform 0.2s ease, background-color 0.5s ease;
+    }
+
+    .card:hover {
+      transform: scale(1.05);
+    }
+
+    .label {
+      font-weight: bold;
+      margin-bottom: 10px;
+    }
+
+    #panic {
+      font-weight: bold;
+      transition: color 0.3s ease;
+    }
+
+    .status-bar {
+      height: 10px;
+      width: 100%;
+      border-radius: 5px;
+      margin-top: 10px;
+      background-color: #eee;
+      overflow: hidden;
+    }
+
+    .status-fill {
+      height: 100%;
+      border-radius: 5px;
+      transition: width 0.5s ease, background-color 0.5s ease;
+    }
+
+    /* Theme Toggle Button */
+    .theme-button {
+      background-color: #00796B;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      padding: 6px 12px;
+      font-size: 14px;
+      cursor: pointer;
+      transition: background-color 0.3s ease, transform 0.2s ease;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+    }
+
+    .theme-button:hover {
+      background-color: #004d40;
+      transform: scale(1.05);
+    }
+
+    /* Light Mode Background */
+    .light-mode {
+      background: linear-gradient(135deg, #e0f7fa, #e8f5e9);
+    }
+
+    /* Dark Mode Background with Animation */
+    .dark-mode {
+      background: linear-gradient(-45deg, #1a237e, #311b92, #0d47a1, #4a148c);
+      background-size: 400% 400%;
+      animation: gradientBG 15s ease infinite;
+    }
+
+    @keyframes gradientBG {
+      0% { background-position: 0% 50%; }
+      50% { background-position: 100% 50%; }
+      100% { background-position: 0% 50%; }
+    }
+
+    .dark-mode .card {
+      background-color: #1e1e1e;
+      color: white;
+    }
+  </style>
+</head>
+<body class="light-mode">
+  <h1>Distress Detection System</h1>
+
+  <div class="card">
+    <div class="label">Average BPM</div>
+    <div id="avg-bpm">--</div>
+    <div class="status-bar"><div id="avg-bpm-bar" class="status-fill" style="width:0%;background-color:green;"></div></div>
+  </div>
+
+  <div class="card">
+    <div class="label">Current BPM</div>
+    <div id="curr-bpm">--</div>
+    <div class="status-bar"><div id="curr-bpm-bar" class="status-fill" style="width:0%;background-color:green;"></div></div>
+  </div>
+
+  <div class="card">
+    <div class="label">GSR Value</div>
+    <div id="gsr">--</div>
+    <div class="status-bar"><div id="gsr-bar" class="status-fill" style="width:0%;background-color:green;"></div></div>
+  </div>
+
+  <div class="card">
+    <div class="label">Panic Button</div>
+    <div id="panic">Not Activated</div>
+  </div>
+
+  <div class="card" style="width: 180px; padding: 10px;">
+    <div class="label">Theme</div>
+    <button id="toggle-theme" class="theme-button">
+      <span id="theme-icon">🌞</span> Light Mode
+    </button>
+  </div>
+
+  <script>
+    const firebaseConfig = {
+      apiKey: "AIzaSyAkADM8FLRg-fCQvTQ-fua5SpcLXGwJk5k",
+      authDomain: "iotsemproject.firebaseapp.com",
+      databaseURL: "https://iotsemproject-default-rtdb.asia-southeast1.firebasedatabase.app/",
+      projectId: "iotsemproject",
+      storageBucket: "iotsemproject.appspot.com",
+      messagingSenderId: "1008398490734",
+      appId: "1:1008398490734:web:10212711157ae96d475a7f"
+    };
+
+    firebase.initializeApp(firebaseConfig);
+    const database = firebase.database();
+    const sensorRef = database.ref("SensorData");
+
+    function updateStatusBar(id, value, max, thresholds) {
+      const bar = document.getElementById(id);
+      const percent = Math.min((value / max) * 100, 100);
+      bar.style.width = percent + "%";
+
+      if (value < thresholds.low) {
+        bar.style.backgroundColor = "green";
+      } else if (value < thresholds.high) {
+        bar.style.backgroundColor = "orange";
+      } else {
+        bar.style.backgroundColor = "red";
+      }
+    }
+
+    sensorRef.on("value", (snapshot) => {
+      const data = snapshot.val();
+      const avgBpm = parseFloat(data.Avg_BPM);
+      const currBpm = parseFloat(data.BPM);
+      const gsr = parseFloat(data.GSR);
+      const panic = data.Panic;
+
+      document.getElementById("avg-bpm").textContent = avgBpm.toFixed(2);
+      document.getElementById("curr-bpm").textContent = currBpm.toFixed(2);
+      document.getElementById("gsr").textContent = gsr.toFixed(2);
+      document.getElementById("panic").textContent = panic ? "Activated" : "Not Activated";
+      document.getElementById("panic").style.color = panic ? "red" : "black";
+
+      updateStatusBar("avg-bpm-bar", avgBpm, 200, { low: 80, high: 120 });
+      updateStatusBar("curr-bpm-bar", currBpm, 200, { low: 80, high: 120 });
+      updateStatusBar("gsr-bar", gsr, 1000, { low: 200, high: 700 });
+    });
+
+    // Theme toggle logic
+    const toggleBtn = document.getElementById("toggle-theme");
+    const themeIcon = document.getElementById("theme-icon");
+
+    toggleBtn.addEventListener("click", () => {
+      const body = document.body;
+      const isDark = body.classList.toggle("dark-mode");
+      body.classList.toggle("light-mode", !isDark);
+
+      if (isDark) {
+        toggleBtn.innerHTML = '<span id="theme-icon">🌙</span> Dark Mode';
+      } else {
+        toggleBtn.innerHTML = '<span id="theme-icon">🌞</span> Light Mode';
+      }
+    });
+  </script>
+</body>
+</html>
